@@ -1,0 +1,4 @@
+name = "MRIHankel"
+uuid = "2a17d402-e055-4066-b6b1-f16aeaecf693"
+authors = ["Felix Horger <felix.horger@kcl.ac.uk>"]
+version = "0.1.0"
