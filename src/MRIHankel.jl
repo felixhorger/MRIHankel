@@ -1,6 +1,8 @@
 
 module MRIHankel
 	
+	export hankel_matrix
+
 	using Base.Cartesian
 	
 	"""
@@ -29,32 +31,28 @@ module MRIHankel
 			channels = data_shape[$N]
 			neighbours = kernelsize^$M
 			neighbours_and_channels = neighbours * channels
-			neighbour_shift = kernelsize ÷ 2
-			neighbour_range = -neighbour_shift:neighbour_shift-1
 
-			hankel = Array{ComplexF64, $N}(undef, kspace_shape..., neighbours_and_channels ) 
+			# Select only point for which the convolution kernel does not leave the calibration area
+			reduced_shape = @ntuple $M (d -> kspace_shape[d] - kernelsize)
 
-			@inbounds @nloops $M k data begin # Iterate over spatial positions
+			# Allocate space
+			hankel = Array{ComplexF64, $N}(undef, reduced_shape..., neighbours_and_channels)
+
+			@inbounds @nloops $M k (d -> 1:reduced_shape[d]) begin # Iterate over spatial positions
 				# Reset counter for neighbours and channels
-				i = 1 
+				i = 1
 				# Get tuple of spatial indices
 				k = @ntuple $M d -> k_d
 				for $(Symbol("l_$N")) = 1:channels # Sneaky
-					@nloops $M l (d -> neighbour_range) (d -> l_d += k_d) begin # Iterate over neighbours
+					@nloops $M l (d -> 0:kernelsize-1) (d -> l_d += k_d) begin # Iterate over neighbours
 						# Shift to current position
-						l = @ntuple $M d -> l_d + k_d
-						# Check if outside of array
-						if (@nany $M d -> l_d < 1) || (@nany $M d -> l_d > kspace_shape[d])
-							hankel[k..., i] = 0 # Outside
-						else
-							hankel[k..., i] = @nref $N data l
-						end
+						hankel[k..., i] = @nref $N data l
 						i += 1
 					end
 				end
 			end
 			# Flatten spatial dimensions to make it a matrix
-			return reshape(hankel, prod(kspace_shape), neighbours_and_channels)
+			return reshape(hankel, prod(reduced_shape), neighbours_and_channels)
 		end
 	end
 
