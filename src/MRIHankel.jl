@@ -17,10 +17,9 @@ module MRIHankel
 	"""
 	@generated function hankel_matrix(
 		data::AbstractArray{<: Number, N},
-		kernelsize::Integer # TODO: This could be tuple
-	) where N
-		@assert N > 1
-		M = N - 1
+		kernelsize::NTuple{M, Integer}
+	) where {N,M}
+		@assert M == N - 1
 
 		return quote
 			@assert iseven(kernelsize)
@@ -29,11 +28,11 @@ module MRIHankel
 			data_shape = size(data)
 			kspace_shape = data_shape[1:$M]
 			channels = data_shape[$N]
-			neighbours = kernelsize^$M
+			neighbours = prod(kernelsize)
 			neighbours_and_channels = neighbours * channels
 
 			# Select only point for which the convolution kernel does not leave the calibration area
-			reduced_shape = @ntuple $M (d -> kspace_shape[d] - kernelsize)
+			reduced_shape = kspace_shape .- kernelsize
 
 			# Allocate space
 			hankel = Array{ComplexF64, $N}(undef, reduced_shape..., neighbours_and_channels)
@@ -44,7 +43,7 @@ module MRIHankel
 				# Get tuple of spatial indices
 				k = @ntuple $M d -> k_d
 				for $(Symbol("l_$N")) = 1:channels # Sneaky
-					@nloops $M l (d -> 0:kernelsize-1) (d -> l_d += k_d) begin # Iterate over neighbours
+					@nloops $M l (d -> 0:kernelsize[d]-1) (d -> l_d += k_d) begin # Iterate over neighbours
 						# Shift to current position
 						hankel[k..., i] = @nref $N data l
 						i += 1
