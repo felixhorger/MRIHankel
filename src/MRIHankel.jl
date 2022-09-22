@@ -16,7 +16,7 @@ module MRIHankel
 
 	"""
 	function hankel_matrix(
-		data::AbstractArray{<: Number, N},
+		data::AbstractArray{<: Number, N}, # [spatial dims..., channels/contrast etc.]
 		kernelsize::NTuple{M, Integer}
 	) where {N,M}
 		@assert M == N - 1
@@ -44,7 +44,7 @@ module MRIHankel
 					# Shift to current position
 					L += K - one_index_shift
 					# Extract from data
-					hankel[K, i] = data[L, c]
+					@inbounds hankel[K, i] = data[L, c]
 					# Next neighbour
 					i += 1
 				end
