@@ -5,40 +5,36 @@ module MRIHankel
 
 	using Base.Cartesian
 
-	function hankel_matrix(data::AbstractArray{T, N}, kernelsize::NTuple{D, Integer}, neighbours::NTuple{M, CartesianIndex{D}}) where {T<:Number, N, D, M}
+	function hankel_matrix(data::AbstractArray{T, N}, neighbours::AbstractVector{<: CartesianIndex{D}}, kernelsize::NTuple{D, Integer}) where {T<:Number, N, D}
 		@assert N > 1
 		@assert N == D + 1
+		@assert check_kernelsize(neighbours, kernelsize)
 
 		# Get dimensions
 		data_shape = size(data)
-		num_channels = data_shape[N]
-		shape = data_shape[1:D]
-		num_neighbours_and_channels = M * num_channels
+		num_channels = data_shape[1]
+		shape = data_shape[2:N]
+		num_channels_and_neighbours = num_channels * length(neighbours)
 
 		# Select only points for which the convolution kernel does not leave the data area
 		reduced_shape = shape .- kernelsize
 
 		# Allocate space
-		hankel = Array{ComplexF64, N}(undef, reduced_shape..., num_neighbours_and_channels)
+		hankel = Array{ComplexF64, N}(undef, num_channels_and_neighbours, reduced_shape...)
 
-		one_index_shift = CartesianIndex(ntuple(d -> 1, Val(D))...)
-		i = 1 # counter for neighbours and num_channels
-		for L in neighbours
-			for c = 1:num_channels
-				for K in CartesianIndices(reduced_shape) # Iterate over spatial positions
-					# Shift to current position
-					κ = L + K - one_index_shift
-					# Extract from data
-					hankel[K, i] = data[L, c]
-				end
-				i += 1 # Next neighbour
+		origin = one(CartesianIndex{D})
+		neighbours = [L - origin for L in neighbours]
+		for K in CartesianIndices(reduced_shape) # Iterate over spatial positions
+			n = 1 # counter for neighbours and num_channels
+			for L in neighbours
+				κ = L + K
+				@inbounds @views hankel[n:n+num_channels-1, K] = data[:, κ]
+				n += num_channels
 			end
 		end
 		# Flatten spatial dimensions to make it a matrix
-		return reshape(hankel, prod(reduced_shape), num_neighbours_and_channels)
+		return reshape(hankel, num_channels_and_neighbours, prod(reduced_shape))
 	end
-
-
 
 	"""
 		data = [spatial dims..., num_channels/contrast etc.]
@@ -57,9 +53,8 @@ module MRIHankel
 		return hankel_matrix(data, kernelsize, CartesianIndices(kernelsize))
 	end
 
-	function hankel_matrix(data::AbstractArray{<: Number}, neighbours::NTuple{N, CartesianIndex{D}}) where {N, D}
-		kernelsize = Tuple(maximum(I[i] for I in neighbours) for i = 1:D)
-		return hankel_matrix(data, kernelsize, neighbours)
+	function check_kernelsize(neighbours::AbstractVector{<: CartesianIndex{D}}, kernelsize::NTuple{D, Integer}) where D
+		return all(0 < I[d] ≤ kernelsize[d] for I in neighbours for d = 1:D)
 	end
 end
 
