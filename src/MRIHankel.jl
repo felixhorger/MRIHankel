@@ -5,7 +5,7 @@ module MRIHankel
 
 	using Base.Cartesian
 
-	function hankel_matrix(data::AbstractArray{T, N}, neighbours::AbstractVector{<: CartesianIndex{D}}, kernelsize::NTuple{D, Integer}) where {T<:Number, N, D}
+	function hankel_matrix(data::AbstractArray{T, N}, neighbours::NTuple{M, CartesianIndex{D}} where M, kernelsize::NTuple{D, Integer}) where {T<:Number, N, D}
 		@assert N > 1
 		@assert N == D + 1
 		@assert check_kernelsize(neighbours, kernelsize)
@@ -23,7 +23,7 @@ module MRIHankel
 		hankel = Array{ComplexF64, N}(undef, num_channels_and_neighbours, reduced_shape...)
 
 		origin = one(CartesianIndex{D})
-		neighbours = [L - origin for L in neighbours]
+		neighbours = Tuple(L - origin for L in neighbours)
 		for K in CartesianIndices(reduced_shape) # Iterate over spatial positions
 			n = 1 # counter for neighbours and num_channels
 			for L in neighbours
@@ -53,8 +53,8 @@ module MRIHankel
 		return hankel_matrix(data, kernelsize, CartesianIndices(kernelsize))
 	end
 
-	function check_kernelsize(neighbours::AbstractVector{<: CartesianIndex{D}}, kernelsize::NTuple{D, Integer}) where D
-		return all(0 < I[d] ≤ kernelsize[d] for I in neighbours for d = 1:D)
+	function check_kernelsize(neighbours::NTuple{N, CartesianIndex{D}}, kernelsize::NTuple{D, Integer}) where {N, D}
+		return (N ≤ prod(kernelsize)) && all(0 < I[d] ≤ kernelsize[d] for I in neighbours for d = 1:D)
 	end
 end
 
