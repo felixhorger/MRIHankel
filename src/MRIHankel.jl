@@ -5,6 +5,10 @@ module MRIHankel
 
 	using Base.Cartesian
 
+	# TODO: version of this were only specific points in `data` gets an entry in the matrix.
+	# This is useful for eg grappa, where lines outside the calib region can be used as well
+
+	# TODO what's faster, tuple or array for neighbours?
 	function hankel_matrix(data::AbstractArray{T, N}, neighbours::NTuple{M, CartesianIndex{D}} where M, kernelsize::NTuple{D, Integer}) where {T<:Number, N, D}
 		@assert N > 1
 		@assert N == D + 1
@@ -17,7 +21,7 @@ module MRIHankel
 		num_channels_and_neighbours = num_channels * length(neighbours)
 
 		# Select only points for which the convolution kernel does not leave the data area
-		reduced_shape = shape .- kernelsize
+		@show reduced_shape = shape .- kernelsize
 
 		# Allocate space
 		hankel = Array{ComplexF64, N}(undef, num_channels_and_neighbours, reduced_shape...)
